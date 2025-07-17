@@ -1,6 +1,6 @@
 const { useState, useEffect } = React;
 
-// NOVO: Define a ordem correta e fixa das colunas da tabela.
+// Define a ordem correta e fixa das colunas da tabela.
 const TABLE_HEADERS = [
     "Nº",
     "Data Leitura",
@@ -18,26 +18,45 @@ const ConsumerUnitHistory = ({ uc, clientId, userId, onClose }) => {
     const [parsedHistory, setParsedHistory] = useState(uc.history || []);
     const [isSaving, setIsSaving] = useState(false);
 
+    const parseNumber = (numStr) => {
+        if (!numStr) return 0;
+        let sanitized = numStr.replace(',', '.');
+        sanitized = sanitized.replace(/\.(?=.*\.)/g, '');
+        return parseFloat(sanitized) || 0;
+    };
+    
     // Função para processar o texto colado
     const parseHistoryText = (text) => {
         const cleanedText = text.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ');
-        const regex = /(\d+)\s*(\d{2}\/\d{2}\/\d{4})\s*(\d+)\s*(\d{1,2}\/\d{4})\s*([\d,.]+)\s*(\d{2}\/\d{2}\/\d{4})\s*(\w+)\s*([\d,.]+)\s*(EM ABERTO|\d{2}\/\d{2}\/\d{4})/g;
+        // <<< ALTERADO: Trocado (\w+) por ([a-zA-Z]+) para capturar apenas letras no campo TIPO.
+        const regex = /(\d+)\s*(\d{2}\/\d{2}\/\d{4})\s*(\d+)\s*(\d{1,2}\/\d{4})\s*([\d.,]+)\s*(\d{2}\/\d{2}\/\d{4})\s*([a-zA-Z]+)\s*([\d.,]+)\s*(EM ABERTO|\d{2}\/\d{2}\/\d{4})/g;
         
         const entries = [];
+        const seen = new Set();
         let match;
+
         while ((match = regex.exec(cleanedText)) !== null) {
-            // Cria o objeto na ordem definida por TABLE_HEADERS
-            entries.push({
-                "Nº": match[1],
-                "Data Leitura": match[2],
-                "Leitura": match[3],
-                "Referência": match[4],
-                "Consumo(kWh)": parseFloat(match[5].replace(',', '.')),
-                "Vencimento": match[6],
-                "Tipo": match[7],
-                "Valor": parseFloat(match[8].replace(',', '.')),
-                "Pagamento": match[9].trim(),
-            });
+            const consumo = parseNumber(match[5]);
+            const valor = parseNumber(match[8]);
+            const referencia = match[4];
+            
+            const uniqueKey = `${referencia}-${consumo}-${valor}`;
+
+            if (!seen.has(uniqueKey)) {
+                seen.add(uniqueKey);
+                
+                entries.push({
+                    "Nº": match[1],
+                    "Data Leitura": match[2],
+                    "Leitura": match[3],
+                    "Referência": referencia,
+                    "Consumo(kWh)": consumo,
+                    "Vencimento": match[6],
+                    "Tipo": match[7], // Agora captura 'FATURA' corretamente
+                    "Valor": valor,   // E o valor completo vai para cá
+                    "Pagamento": match[9].trim(),
+                });
+            }
         }
         return entries;
     };
@@ -45,7 +64,14 @@ const ConsumerUnitHistory = ({ uc, clientId, userId, onClose }) => {
     const handleProcessText = () => {
         const parsed = parseHistoryText(historyText);
         if (parsed.length > 0) {
-            setParsedHistory(parsed);
+            const sorted = parsed.sort((a, b) => {
+                const [dayA, monthA, yearA] = a["Data Leitura"].split('/');
+                const [dayB, monthB, yearB] = b["Data Leitura"].split('/');
+                const dateA = new Date(`${yearA}-${monthA}-${dayA}`);
+                const dateB = new Date(`${yearB}-${monthB}-${dayB}`);
+                return dateB - dateA;
+            });
+            setParsedHistory(sorted);
         } else {
             alert("Não foi possível extrair dados do texto. Verifique o formato do texto colado.");
         }
@@ -101,7 +127,6 @@ const ConsumerUnitHistory = ({ uc, clientId, userId, onClose }) => {
                                 <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50">
                                         <tr>
-                                            {/* ALTERADO: Usa a ordem fixa para os cabeçalhos */}
                                             {TABLE_HEADERS.map(header => (
                                                 <th key={header} className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{header}</th>
                                             ))}
@@ -110,7 +135,6 @@ const ConsumerUnitHistory = ({ uc, clientId, userId, onClose }) => {
                                     <tbody className="bg-white divide-y divide-gray-200">
                                         {parsedHistory.map((row, index) => (
                                             <tr key={index}>
-                                                {/* ALTERADO: Renderiza as células na ordem fixa, buscando pelo nome do cabeçalho */}
                                                 {TABLE_HEADERS.map(header => (
                                                     <td key={`${index}-${header}`} className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                                                         {typeof row[header] === 'number' ? row[header].toFixed(2) : row[header]}

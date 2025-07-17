@@ -1,24 +1,25 @@
 Sobre os erros atuais do programa:
 
-Quando colo uma base de dados no Histórico, ele tem que identificar valores repetidos e excluir ao gerar a tabela.
+######## Quando colo uma base de dados no Histórico, ele tem que identificar valores repetidos e excluir ao gerar a tabela.
 
-Os valores devem ser compreendidos como x.xxx,xx no sistema brasileiro.
+######## Os valores devem ser compreendidos como x.xxx,xx no sistema brasileiro.
+
+
+########Os dados do DB devem ter backup feitos regularmente.
+
+######## os Status dos clientes devem ser alterados para outra forma:
+######## Em Garantia, Expirada, Monitoramento, Manutenção, O&M Completo. Todos constados como "Vencidos" passam a ser Expoirados. 
+######## todos com "Enviado Relatório" passam a ser Expirados, mas com um um checkbox que mostra no card que a usina do cliente foi 
+######## entregue. Nesse caso, devo poder implementar essa forma de busca por clientes com relatórios enviados.
+
+
+
 
 Os dados dos clientes podem ser alterados (como o número do cliente, nome e etc.)
 
-Os dados do DB devem ter backup feitos regularmente.
-
-os Status dos clientes devem ser alterados para outra forma:
-Em Garantia, Expirada, Monitoramento, Manutenção, O&M Completo. Todos constados como "Vencidos" passam a ser Expoirados. 
-todos com "Enviado Relatório" passam a ser Expirados, mas com um um checkbox que mostra no card que a usina do cliente foi 
-entregue. Nesse caso, devo poder implementar essa forma de busca por clientes com relatórios enviados.
-
-
 Corrigir bugs de não poder digitar que ocorrem às vezes.
 
-
 Alterar a versão do app com base nessas correções.
-
 
 poder criar um relatório mesmo se o saldo for 0, mas ter um aviso nesse cliente que ele não possui saldo, 
 como uma tag aparecendo no card dele para poder ser pesquisado.
