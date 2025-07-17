@@ -1,40 +1,58 @@
 const { useEffect, useMemo, useRef } = React;
 
-// Preço do kWh para cálculo - pode ser ajustado conforme necessário
+// Preço do kWh para cálculo (ajustável)
 const KWH_PRICE = 0.99;
+
+// --- CORES DO TEMA (Ajustadas para um visual mais profissional) ---
+const COLORS = {
+    primary: '#007BFF',    // Azul mais corporativo
+    secondary: '#FFA500',  // Laranja
+    text: '#343a40',       // Texto principal (quase preto)
+    textLight: '#6c757d',  // Texto secundário (cinza)
+    background: '#f8f9fa', // Fundo de linhas da tabela
+    white: '#FFFFFF',
+    border: '#dee2e6'      // Bordas
+};
 
 const Report = ({ client, consumerUnits, onReportGenerated }) => {
     const chartRef = useRef(null);
-    const reportRef = useRef(null);
+    const page1Ref = useRef(null);
+    const page2Ref = useRef(null);
 
-    // Agrega os dados para o gráfico e as tabelas
     const processedData = useMemo(() => {
         const monthlyData = {};
-
-        consumerUnits.forEach(uc => {
-            if (uc.history) {
-                uc.history.forEach(item => {
-                    const monthYear = item["Referência"];
-                    if (!monthlyData[monthYear]) {
-                        monthlyData[monthYear] = { totalConsumption: 0, totalPaid: 0, ucs: {} };
-                    }
-                    monthlyData[monthYear].totalConsumption += item["Consumo(kWh)"];
-                    monthlyData[monthYear].totalPaid += item["Valor"];
-                    if (!monthlyData[monthYear].ucs[uc.name]) {
-                        monthlyData[monthYear].ucs[uc.name] = 0;
-                    }
-                    monthlyData[monthYear].ucs[uc.name] += item["Consumo(kWh)"];
-                });
-            }
-        });
+        if (consumerUnits) {
+            consumerUnits.forEach(uc => {
+                if (uc.history) {
+                    uc.history.forEach(item => {
+                        const monthYear = item["Referência"];
+                        // Validação para garantir que é um mês/ano válido
+                        if (monthYear && typeof monthYear === 'string' && monthYear.includes('/')) {
+                            if (!monthlyData[monthYear]) {
+                                monthlyData[monthYear] = { totalConsumption: 0, totalPaid: 0, ucs: {} };
+                            }
+                            monthlyData[monthYear].totalConsumption += parseFloat(item["Consumo(kWh)"]) || 0;
+                            monthlyData[monthYear].totalPaid += parseFloat(item["Valor"]) || 0;
+                            if (!monthlyData[monthYear].ucs[uc.name]) {
+                                monthlyData[monthYear].ucs[uc.name] = 0;
+                            }
+                            monthlyData[monthYear].ucs[uc.name] += parseFloat(item["Consumo(kWh)"]) || 0;
+                        }
+                    });
+                }
+            });
+        }
 
         const labels = Object.keys(monthlyData).sort((a, b) => {
              const [m1, y1] = a.split('/');
              const [m2, y2] = b.split('/');
              return new Date(y1, m1 - 1) - new Date(y2, m2 - 1);
         });
-        
+
+        const ucColors = [COLORS.primary, COLORS.secondary, '#FFC107', '#28A745', '#6F42C1'];
         const datasets = {};
+        let colorIndex = 0;
+        
         labels.forEach(label => {
             const ucsInMonth = monthlyData[label].ucs;
             Object.keys(ucsInMonth).forEach(ucName => {
@@ -42,13 +60,15 @@ const Report = ({ client, consumerUnits, onReportGenerated }) => {
                     datasets[ucName] = {
                         label: ucName,
                         data: [],
-                        backgroundColor: `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 0.6)`
+                        backgroundColor: ucColors[colorIndex % ucColors.length]
                     };
+                    colorIndex++;
                 }
             });
         });
+
         Object.values(datasets).forEach(ds => {
-            ds.data = labels.map(label => monthlyData[label].ucs[ds.label] || 0);
+            ds.data = labels.map(label => (monthlyData[label] && monthlyData[label].ucs[ds.label]) || 0);
         });
 
         const tableRows = labels.map(label => {
@@ -71,143 +91,164 @@ const Report = ({ client, consumerUnits, onReportGenerated }) => {
         return { labels, datasets: Object.values(datasets), tableRows, totals };
     }, [client, consumerUnits]);
 
-    // Efeito para criar o gráfico e gerar o PDF
     useEffect(() => {
-        const chartCtx = chartRef.current.getContext('2d');
-        const chartInstance = new Chart(chartCtx, {
-            type: 'bar',
-            data: {
-                labels: processedData.labels,
-                datasets: processedData.datasets
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    title: { display: true, text: 'Histórico de Consumo (kWh) por Mês', font: { size: 14 } }, // Fonte menor
-                    legend: { position: 'top', labels: { font: { size: 10 } } } // Fonte menor
+        const generatePdf = async () => {
+            const chartCtx = chartRef.current.getContext('2d');
+            const chartInstance = new Chart(chartCtx, {
+                type: 'bar',
+                data: {
+                    labels: processedData.labels,
+                    datasets: processedData.datasets
                 },
-                scales: {
-                    x: { stacked: true, ticks: { font: { size: 10 } } },
-                    y: { stacked: true, beginAtZero: true, ticks: { font: { size: 10 } } }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    plugins: {
+                        title: { display: false },
+                        legend: { position: 'bottom', labels: { font: { size: 10, family: 'Arial' }, color: COLORS.text } }
+                    },
+                    scales: {
+                        x: { stacked: true, ticks: { font: { size: 10, family: 'Arial' }, color: COLORS.textLight }, grid: { display: false } },
+                        y: { stacked: true, beginAtZero: true, ticks: { font: { size: 10, family: 'Arial' }, color: COLORS.textLight }, grid: { color: COLORS.border } }
+                    }
                 }
-            }
-        });
-
-        setTimeout(() => {
-            html2canvas(reportRef.current, { scale: 2 }).then(canvas => {
-                const imgData = canvas.toDataURL('image/png');
-                const pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-                const pdfWidth = pdf.internal.pageSize.getWidth();
-                const canvasWidth = canvas.width;
-                const canvasHeight = canvas.height;
-                const ratio = canvasHeight / canvasWidth;
-                const imgHeight = pdfWidth * ratio;
-
-                // Checa se a altura da imagem é maior que a página, se for, divide em páginas
-                let heightLeft = imgHeight;
-                let position = 0;
-                
-                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-                heightLeft -= pdf.internal.pageSize.getHeight();
-
-                while (heightLeft > 0) {
-                    position = heightLeft - imgHeight;
-                    pdf.addPage();
-                    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-                    heightLeft -= pdf.internal.pageSize.getHeight();
-                }
-
-                pdf.save(`relatorio-${client.name.replace(/\s/g, '_')}.pdf`);
-                onReportGenerated();
             });
-        }, 500);
 
-        return () => chartInstance.destroy();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+            
+            const addPageAsImage = async (ref, pageNumber) => {
+                const canvas = await html2canvas(ref.current, { scale: 2, backgroundColor: null });
+                const imgData = canvas.toDataURL('image/png');
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+                if (pageNumber > 1) {
+                    pdf.addPage();
+                }
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight);
+            };
+
+            await addPageAsImage(page1Ref, 1);
+            
+            if (processedData.tableRows.length > 0) {
+                await addPageAsImage(page2Ref, 2);
+            }
+            
+            pdf.save(`relatorio-${client.name.replace(/\s/g, '_')}.pdf`);
+            chartInstance.destroy();
+            onReportGenerated();
+        };
+
+        generatePdf();
     }, [processedData, onReportGenerated, client.name]);
+    
+    // --- COMPONENTES DE ESTILO ---
+    
+    const Header = ({ title, clientName }) => (
+        <div style={{ display: 'flex', alignItems: 'center', padding: '20px 30px', backgroundColor: COLORS.primary, color: COLORS.white }}>
+            <img src="./assets/logo.png" alt="Logo" style={{ width: '80px', height: '80px', marginRight: '20px' }} />
+            <div>
+                <h1 style={{ fontSize: '20px', fontWeight: 'bold', margin: 0 }}>{title}</h1>
+                <p style={{ fontSize: '12px', margin: '5px 0 0 0' }}>{clientName}</p>
+            </div>
+        </div>
+    );
+
+    const StatCard = ({ title, value, color }) => (
+        <div style={{
+            padding: '15px',
+            border: `1px solid ${COLORS.border}`,
+            borderRadius: '8px',
+            textAlign: 'center',
+            backgroundColor: COLORS.white,
+            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+        }}>
+            <h3 style={{ fontSize: '11px', color: COLORS.textLight, fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase' }}>{title}</h3>
+            <p style={{ fontSize: '22px', fontWeight: 'bold', color: color, margin: 0 }}>{value}</p>
+        </div>
+    );
+    
+    const commonStyles = {
+        page: { fontFamily: 'Arial, sans-serif', color: COLORS.text, fontSize: '10px', backgroundColor: COLORS.white },
+        content: { padding: '20px 30px 30px 30px' },
+        h2: { fontSize: '16px', fontWeight: 'bold', color: COLORS.primary, borderBottom: `2px solid ${COLORS.secondary}`, paddingBottom: '6px', marginBottom: '15px' },
+        table: { width: '100%', borderCollapse: 'collapse', fontSize: '10px' },
+        th: { padding: '10px', borderBottom: `2px solid ${COLORS.border}`, textAlign: 'left', backgroundColor: '#f2f2f2', fontWeight: 'bold'},
+        td: { padding: '10px', borderBottom: `1px solid ${COLORS.border}` },
+    };
 
     return (
-        // Estilos para compactar o layout
-        <div style={{ position: 'absolute', left: '-9999px', top: 0, width: '700px', backgroundColor: 'white' }}>
-            <div ref={reportRef} style={{ padding: '25px', fontFamily: 'sans-serif', color: '#333', fontSize: '10px' }}>
-                <h1 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1a202c', borderBottom: '2px solid #4f46e5', paddingBottom: '8px', marginBottom: '5px' }}>
-                    Relatório de Consumo e Economia
-                </h1>
-                <p style={{ fontSize: '12px' }}><strong>Cliente:</strong> {client.clientNumber} - {client.name}</p>
+        <div style={{ position: 'absolute', left: '-9999px', top: 0, width: '700px' }}>
+            
+            {/* --- PÁGINA 1 --- */}
+            <div ref={page1Ref} style={commonStyles.page}>
+                <Header title="Relatório de Consumo e Economia" clientName={`${client.clientNumber} - ${client.name}`} />
+                <div style={commonStyles.content}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', marginBottom: '30px' }}>
+                        <StatCard title="Custo Sem Solar" value={processedData.totals.estimatedCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} color={COLORS.text} />
+                        <StatCard title="Valor Pago" value={processedData.totals.paid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} color={COLORS.primary} />
+                        <StatCard title="Economia Gerada" value={processedData.totals.savings.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} color={COLORS.secondary} />
+                    </div>
+                    
+                    <h2 style={commonStyles.h2}>Consumo Mensal (kWh)</h2>
+                    <div style={{ height: '250px', marginBottom: '30px' }}>
+                        <canvas ref={chartRef}></canvas>
+                    </div>
 
-                <div style={{ marginTop: '20px' }}>
-                    <canvas ref={chartRef}></canvas>
+                    <h2 style={commonStyles.h2}>Saldos por Unidade Consumidora</h2>
+                    <table style={commonStyles.table}>
+                        <thead>
+                            <tr>
+                                <th style={commonStyles.th}>Unidade Consumidora</th>
+                                <th style={commonStyles.th}>Saldo Atual (kWh)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {consumerUnits.map((uc, index) => (
+                                <tr key={uc.id} style={{ backgroundColor: index % 2 === 0 ? COLORS.white : COLORS.background }}>
+                                    <td style={commonStyles.td}>{uc.name}</td>
+                                    <td style={commonStyles.td}>{parseFloat(uc.balanceKWH).toFixed(2)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginTop: '20px', textAlign: 'center' }}>
-                    <div style={{ padding: '15px', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-                        <h3 style={{ fontSize: '11px', color: '#718096', fontWeight: 'bold', marginBottom: '5px' }}>CUSTO SEM SOLAR</h3>
-                        <p style={{ fontSize: '20px', fontWeight: 'bold', color: '#e53e3e' }}>
-                            {processedData.totals.estimatedCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </p>
-                    </div>
-                     <div style={{ padding: '15px', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-                        <h3 style={{ fontSize: '11px', color: '#718096', fontWeight: 'bold', marginBottom: '5px' }}>VALOR PAGO</h3>
-                        <p style={{ fontSize: '20px', fontWeight: 'bold', color: '#4a5568' }}>
-                            {processedData.totals.paid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </p>
-                    </div>
-                    <div style={{ padding: '15px', border: '1px solid #c6f6d5', borderRadius: '8px', backgroundColor: '#f0fff4' }}>
-                        <h3 style={{ fontSize: '11px', color: '#2f855a', fontWeight: 'bold', marginBottom: '5px' }}>ECONOMIA GERADA</h3>
-                        <p style={{ fontSize: '20px', fontWeight: 'bold', color: '#276749' }}>
-                           {processedData.totals.savings.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </p>
-                    </div>
-                </div>
+            </div>
 
-                <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '25px', borderBottom: '1px solid #cbd5e0', paddingBottom: '6px' }}>
-                    Detalhes Mensais Consolidados
-                </h2>
-                <table style={{ width: '100%', marginTop: '10px', borderCollapse: 'collapse', fontSize: '10px' }}>
-                    <thead>
-                        <tr style={{ backgroundColor: '#f7fafc' }}>
-                            <th style={{ padding: '8px', border: '1px solid #e2e8f0', textAlign: 'left' }}>Mês/Ano</th>
-                            <th style={{ padding: '8px', border: '1px solid #e2e8f0', textAlign: 'left' }}>Consumo (kWh)</th>
-                            <th style={{ padding: '8px', border: '1px solid #e2e8f0', textAlign: 'left' }}>Valor Pago</th>
-                            <th style={{ padding: '8px', border: '1px solid #e2e8f0', textAlign: 'left' }}>Economia Estimada</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {processedData.tableRows.map(row => (
-                             <tr key={row.label}>
-                                <td style={{ padding: '8px', border: '1px solid #e2e8f0' }}>{row.label}</td>
-                                <td style={{ padding: '8px', border: '1px solid #e2e8f0' }}>{row.consumption.toFixed(2)}</td>
-                                <td style={{ padding: '8px', border: '1px solid #e2e8f0' }}>{row.paid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                                <td style={{ padding: '8px', border: '1px solid #e2e8f0', color: '#2f855a' }}>{row.savings.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+            {/* --- PÁGINA 2 --- */}
+            <div ref={page2Ref} style={commonStyles.page}>
+                <Header title="Histórico Detalhado de Faturas" clientName={`${client.clientNumber} - ${client.name}`} />
+                <div style={commonStyles.content}>
+                    <table style={commonStyles.table}>
+                        <thead>
+                            <tr>
+                                <th style={commonStyles.th}>Mês/Ano</th>
+                                <th style={commonStyles.th}>Consumo (kWh)</th>
+                                <th style={commonStyles.th}>Valor Pago</th>
+                                <th style={commonStyles.th}>Economia Estimada</th>
                             </tr>
-                        ))}
-                        <tr style={{ backgroundColor: '#edf2f7', fontWeight: 'bold' }}>
-                            <td style={{ padding: '8px', border: '1px solid #e2e8f0' }}>TOTAIS</td>
-                            <td style={{ padding: '8px', border: '1px solid #e2e8f0' }}>{processedData.totals.consumption.toFixed(2)}</td>
-                            <td style={{ padding: '8px', border: '1px solid #e2e8f0' }}>{processedData.totals.paid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                            <td style={{ padding: '8px', border: '1px solid #e2e8f0', color: '#276749' }}>{processedData.totals.savings.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                        </tr>
-                    </tbody>
-                </table>
-                
-                 <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '25px', borderBottom: '1px solid #cbd5e0', paddingBottom: '6px' }}>
-                    Saldos por Unidade Consumidora
-                </h2>
-                <table style={{ width: '100%', marginTop: '10px', borderCollapse: 'collapse', fontSize: '10px' }}>
-                    <thead>
-                        <tr style={{ backgroundColor: '#f7fafc' }}>
-                            <th style={{ padding: '8px', border: '1px solid #e2e8f0', textAlign: 'left' }}>Unidade Consumidora</th>
-                            <th style={{ padding: '8px', border: '1px solid #e2e8f0', textAlign: 'left' }}>Saldo Atual (kWh)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {consumerUnits.map(uc => (
-                            <tr key={uc.id}>
-                                <td style={{ padding: '8px', border: '1px solid #e2e8f0' }}>{uc.name}</td>
-                                <td style={{ padding: '8px', border: '1px solid #e2e8f0' }}>{parseFloat(uc.balanceKWH).toFixed(2)}</td>
+                        </thead>
+                        <tbody>
+                            {processedData.tableRows.map((row, index) => (
+                                <tr key={row.label} style={{ backgroundColor: index % 2 === 0 ? COLORS.white : COLORS.background }}>
+                                    <td style={commonStyles.td}>{row.label}</td>
+                                    <td style={commonStyles.td}>{row.consumption.toFixed(2)}</td>
+                                    <td style={commonStyles.td}>{row.paid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                                    <td style={{...commonStyles.td, color: COLORS.secondary, fontWeight: 'bold' }}>{row.savings.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                                </tr>
+                            ))}
+                            <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
+                                <td style={commonStyles.td}>TOTAIS</td>
+                                <td style={commonStyles.td}>{processedData.totals.consumption.toFixed(2)}</td>
+                                <td style={commonStyles.td}>{processedData.totals.paid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                                <td style={{...commonStyles.td, color: COLORS.secondary }}>{processedData.totals.savings.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );
