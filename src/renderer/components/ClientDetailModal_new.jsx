@@ -29,7 +29,7 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
     useEffect(() => {
         const { getFirestore, collection, query, onSnapshot } = window.firebase;
         const db = getFirestore();
-        const ucQuery = query(collection(db, `solar-clients/${userId}/clients/${client.id}/consumerUnits`));
+        const ucQuery = query(collection(db, `solar-clients/${client.id}/consumerUnits`));
         const unsubscribe = onSnapshot(ucQuery, (snapshot) => {
             const ucData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setConsumerUnits(ucData);
@@ -46,7 +46,7 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
         if (!newUcName.trim()) return;
         const { getFirestore, collection, addDoc, serverTimestamp } = window.firebase;
         const db = getFirestore();
-        const ucRef = collection(db, `solar-clients/${userId}/clients/${client.id}/consumerUnits`);
+        const ucRef = collection(db, `solar-clients/${client.id}/consumerUnits`);
         await addDoc(ucRef, { name: newUcName.trim(), balanceKWH: 0, history: [], createdAt: serverTimestamp() });
         setNewUcName('');
     };
@@ -55,13 +55,13 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
         if (!confirm('Tem certeza?')) return;
         const { getFirestore, doc, deleteDoc } = window.firebase;
         const db = getFirestore();
-        await deleteDoc(doc(db, `solar-clients/${userId}/clients/${client.id}/consumerUnits`, ucId));
+        await deleteDoc(doc(db, `solar-clients/${client.id}/consumerUnits`, ucId));
     };
 
     const debouncedUpdateBalance = useCallback(debounce(async (ucId, balanceToSave) => {
         const { getFirestore, doc, updateDoc } = window.firebase;
         const db = getFirestore();
-        await updateDoc(doc(db, `solar-clients/${userId}/clients/${client.id}/consumerUnits`, ucId), { balanceKWH: parseFloat(balanceToSave) || 0 });
+       await updateDoc(doc(db, `solar-clients/${client.id}/consumerUnits`, ucId), { balanceKWH: parseFloat(balanceToSave) || 0 });
     }, 1000), [userId, client.id]);
 
     const handleBalanceChange = (ucId, value) => {
@@ -74,7 +74,7 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
         setSaving(true);
         const { getFirestore, doc, updateDoc } = window.firebase;
         const db = getFirestore();
-        await updateDoc(doc(db, `solar-clients/${userId}/clients`, client.id), { status: selectedStatus });
+        await updateDoc(doc(db, 'solar-clients', client.id), { status: selectedStatus });
         setSaving(false);
         alert('Status atualizado!');
     };

@@ -1,6 +1,8 @@
 {
   "name": "hub-monitoramento",
   "version": "1.0.0",
+  "description": "Aplicação de gestão de clientes solares.",
+  "author": "Sua Empresa ou Seu Nome",
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",

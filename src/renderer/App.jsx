@@ -30,7 +30,7 @@ function App() {
         setLoading(true);
         const { getFirestore, collection, query, onSnapshot } = window.firebase;
         const db = getFirestore();
-        const q = query(collection(db, `solar-clients/${userId}/clients`));
+        const q = query(collection(db, 'solar-clients')); 
 
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const clientsData = [];

@@ -55,7 +55,7 @@ const ConsumerUnitHistory = ({ uc, clientId, userId, onClose }) => {
         setIsSaving(true);
         const { getFirestore, doc, updateDoc } = window.firebase;
         const db = getFirestore();
-        const ucRef = doc(db, `solar-clients/${userId}/clients/${clientId}/consumerUnits`, uc.id);
+        const ucRef = doc(db, `solar-clients/${clientId}/consumerUnits`, uc.id);
         try {
             await updateDoc(ucRef, { history: parsedHistory });
             alert('Histórico salvo com sucesso!');

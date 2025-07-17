@@ -96,7 +96,7 @@ const ImportView = ({ userId, setActiveTab }) => {
                             createdAt: serverTimestamp()
                         };
 
-                        const clientsRef = collection(db, `solar-clients/${userId}/clients`);
+                        const clientsRef = collection(db, 'solar-clients');
                         const q = query(clientsRef, 
                             where("clientNumber", "==", clientData.clientNumber)
                         );
@@ -118,7 +118,7 @@ const ImportView = ({ userId, setActiveTab }) => {
                             clientId = newClientRef.id;
                         }
                         
-                        const historyRef = collection(db, `solar-clients/${userId}/clients/${clientId}/history`);
+                        const historyRef = collection(db, `solar-clients/${clientId}/history`);
                         await addDoc(historyRef, {
                             event: isNewClient ? "Cliente importado da planilha." : "Dados do cliente atualizados via planilha.",
                             timestamp: serverTimestamp()
