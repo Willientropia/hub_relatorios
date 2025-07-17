@@ -1,0 +1,16 @@
+/* Arquivo CSS para substituir o CDN Tailwind em produção */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estilos personalizados para complementar o Tailwind */
+body {
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+.tab-active {
+    border-color: #4f46e5;
+    color: #4f46e5;
+    font-weight: 600;
+}
