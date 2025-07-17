@@ -4,11 +4,12 @@ const AdvancedFilter = ({ clients, onFilterChange }) => {
     const [filters, setFilters] = useState({
         search: '',
         status: 'all',
-        sortBy: 'clientNumber', // clientNumber, name, city, installDate
-        sortOrder: 'asc', // asc, desc
+        sortBy: 'clientNumber',
+        sortOrder: 'asc',
         city: 'all',
-        dataCompleteness: 'all', // all, complete, incomplete
-        missingFields: [] // array de campos específicos que estão faltando
+        dataCompleteness: 'all',
+        reportSent: 'all',
+        missingFields: []
     });
 
     const [isExpanded, setIsExpanded] = useState(false);
@@ -18,7 +19,6 @@ const AdvancedFilter = ({ clients, onFilterChange }) => {
         const citySet = new Set();
         clients.forEach(client => {
             if (client.address && client.address !== 'N/A') {
-                // Tentar extrair cidade do endereço (pega a última parte após vírgula)
                 const parts = client.address.split(',');
                 if (parts.length > 1) {
                     const city = parts[parts.length - 1].trim();
@@ -26,7 +26,6 @@ const AdvancedFilter = ({ clients, onFilterChange }) => {
                         citySet.add(city);
                     }
                 } else {
-                    // Se não tem vírgula, usa o endereço inteiro como cidade
                     citySet.add(client.address.trim());
                 }
             }
@@ -46,31 +45,6 @@ const AdvancedFilter = ({ clients, onFilterChange }) => {
                    (field === 'panels' && (value === 0 || value === '0')) ||
                    (field === 'power' && (value === 0 || value === '0'));
         });
-    };
-
-    // Função para obter campos faltantes de um cliente
-    const getMissingFields = (client) => {
-        const fields = {
-            name: 'Nome',
-            address: 'Endereço', 
-            installDate: 'Data de Instalação',
-            panels: 'Nº de Placas',
-            power: 'Potência'
-        };
-        
-        const missing = [];
-        Object.keys(fields).forEach(field => {
-            const value = client[field];
-            if (!value || 
-                value === 'N/A' || 
-                value === 'Não informado' || 
-                String(value).trim() === '' ||
-                (field === 'panels' && (value === 0 || value === '0')) ||
-                (field === 'power' && (value === 0 || value === '0'))) {
-                missing.push(fields[field]);
-            }
-        });
-        return missing;
     };
 
     // Extrair cidade do endereço do cliente
@@ -106,6 +80,14 @@ const AdvancedFilter = ({ clients, onFilterChange }) => {
             result = result.filter(client => client.status === filters.status);
         }
 
+        // Filtro de relatório enviado
+        if (filters.reportSent !== 'all') {
+            result = result.filter(client => {
+                const hasReportSent = client.reportSent === true;
+                return filters.reportSent === 'sent' ? hasReportSent : !hasReportSent;
+            });
+        }
+
         // Filtro de cidade
         if (filters.city !== 'all') {
             result = result.filter(client => getClientCity(client) === filters.city);
@@ -136,7 +118,6 @@ const AdvancedFilter = ({ clients, onFilterChange }) => {
                     valueB = getClientCity(b).toLowerCase();
                     break;
                 case 'installDate':
-                    // Converter data DD/MM/YYYY para ordenação
                     const parseDate = (dateStr) => {
                         if (!dateStr || dateStr === 'N/A') return new Date(0);
                         const parts = dateStr.split('/');
@@ -166,10 +147,13 @@ const AdvancedFilter = ({ clients, onFilterChange }) => {
     // Estatísticas dos filtros aplicados
     const filterStats = useMemo(() => {
         const incompleteClients = clients.filter(hasIncompleteData);
+        const reportSentClients = clients.filter(client => client.reportSent === true);
+        
         return {
             total: filteredAndSortedClients.length,
             totalClients: clients.length,
             incompleteCount: incompleteClients.length,
+            reportSentCount: reportSentClients.length,
             citiesCount: cities.length
         };
     }, [filteredAndSortedClients, clients, cities]);
@@ -191,6 +175,7 @@ const AdvancedFilter = ({ clients, onFilterChange }) => {
             sortOrder: 'asc',
             city: 'all',
             dataCompleteness: 'all',
+            reportSent: 'all',
             missingFields: []
         });
     };
@@ -200,72 +185,192 @@ const AdvancedFilter = ({ clients, onFilterChange }) => {
                filters.status !== 'all' || 
                filters.city !== 'all' || 
                filters.dataCompleteness !== 'all' ||
+               filters.reportSent !== 'all' ||
                filters.sortBy !== 'clientNumber' ||
                filters.sortOrder !== 'asc';
     };
 
+    // Função para estilizar botões
+    const getButtonClass = (isActive, variant = 'default') => {
+        if (isActive) {
+            switch (variant) {
+                case 'success':
+                    return "px-4 py-2 text-sm font-medium rounded-lg bg-green-600 text-white border border-green-600 shadow-sm";
+                case 'danger':
+                    return "px-4 py-2 text-sm font-medium rounded-lg bg-red-600 text-white border border-red-600 shadow-sm";
+                case 'warning':
+                    return "px-4 py-2 text-sm font-medium rounded-lg bg-orange-600 text-white border border-orange-600 shadow-sm";
+                case 'info':
+                    return "px-4 py-2 text-sm font-medium rounded-lg bg-purple-600 text-white border border-purple-600 shadow-sm";
+                case 'primary':
+                    return "px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white border border-blue-600 shadow-sm";
+                default:
+                    return "px-4 py-2 text-sm font-medium rounded-lg bg-gray-600 text-white border border-gray-600 shadow-sm";
+            }
+        } else {
+            return "px-4 py-2 text-sm font-medium rounded-lg bg-white text-gray-700 border border-gray-300 hover:bg-gray-50";
+        }
+    };
+
     return (
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
-            {/* Linha Principal de Filtros */}
-            <div className="flex flex-col lg:flex-row gap-4 items-center">
-                {/* Busca */}
-                <div className="flex-1 min-w-0">
-                    <input
-                        type="text"
-                        placeholder="🔍 Buscar por nº, nome ou endereço..."
-                        value={filters.search}
-                        onChange={(e) => handleFilterChange('search', e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                </div>
+        <div className="bg-white rounded-lg shadow border border-gray-200 mb-6">
+            {/* Header do Filtro */}
+            <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                    {/* Campo de Busca */}
+                    <div className="flex-1">
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="🔍 Buscar por número, nome ou endereço..."
+                                value={filters.search}
+                                onChange={(e) => handleFilterChange('search', e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                        </div>
+                    </div>
 
-                {/* Status */}
-                <select
-                    value={filters.status}
-                    onChange={(e) => handleFilterChange('status', e.target.value)}
-                    className="p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                    <option value="all">Todos os Status</option>
-                    <option value="active">Em Garantia</option>
-                    <option value="expired">Expirada</option>
-                    <option value="monitoring">Monitoramento</option>
-                    <option value="recurring_maintenance">Manutenção</option>
-                    <option value="om_complete">O&M Completo</option>
-                </select>
-
-                {/* Botões de Ação */}
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setIsExpanded(!isExpanded)}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors flex items-center"
-                    >
-                        ⚙️ Filtros {isExpanded ? '🔼' : '🔽'}
-                    </button>
-                    
-                    {hasActiveFilters() && (
+                    {/* Controles */}
+                    <div className="flex items-center gap-3">
                         <button
-                            onClick={resetFilters}
-                            className="px-3 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors text-sm"
+                            onClick={() => setIsExpanded(!isExpanded)}
+                            className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                         >
-                            🗑️ Limpar
+                            ⚙️ Filtros Avançados {isExpanded ? '🔼' : '🔽'}
                         </button>
-                    )}
+                        
+                        {hasActiveFilters() && (
+                            <button
+                                onClick={resetFilters}
+                                className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                            >
+                                ✕ Limpar
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {/* Filtros Avançados (Expandidos) */}
+            {/* Filtros Principais - APENAS STATUS DA GARANTIA */}
+            <div className="px-6 py-4">
+                {/* Status */}
+                <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-3">Status da Garantia</label>
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            onClick={() => handleFilterChange('status', 'all')}
+                            className={getButtonClass(filters.status === 'all')}
+                        >
+                            Todos
+                        </button>
+                        <button
+                            onClick={() => handleFilterChange('status', 'active')}
+                            className={getButtonClass(filters.status === 'active', 'success')}
+                        >
+                            Em Garantia
+                        </button>
+                        <button
+                            onClick={() => handleFilterChange('status', 'expired')}
+                            className={getButtonClass(filters.status === 'expired', 'danger')}
+                        >
+                            Expirada
+                        </button>
+                        <button
+                            onClick={() => handleFilterChange('status', 'monitoring')}
+                            className={getButtonClass(filters.status === 'monitoring', 'primary')}
+                        >
+                            Monitoramento
+                        </button>
+                        <button
+                            onClick={() => handleFilterChange('status', 'recurring_maintenance')}
+                            className={getButtonClass(filters.status === 'recurring_maintenance', 'info')}
+                        >
+                            Manutenção
+                        </button>
+                        <button
+                            onClick={() => handleFilterChange('status', 'om_complete')}
+                            className={getButtonClass(filters.status === 'om_complete', 'warning')}
+                        >
+                            O&M Completo
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Filtros Avançados - AGORA INCLUINDO RELATÓRIOS E DADOS */}
             {isExpanded && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                    {/* Relatórios */}
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-3">Relatórios</label>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                onClick={() => handleFilterChange('reportSent', 'all')}
+                                className={getButtonClass(filters.reportSent === 'all')}
+                            >
+                                Todos
+                            </button>
+                            <button
+                                onClick={() => handleFilterChange('reportSent', 'sent')}
+                                className={getButtonClass(filters.reportSent === 'sent', 'primary')}
+                            >
+                                📄 Relatório Enviado
+                                {filterStats.reportSentCount > 0 && (
+                                    <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800">
+                                        {filterStats.reportSentCount}
+                                    </span>
+                                )}
+                            </button>
+                            <button
+                                onClick={() => handleFilterChange('reportSent', 'not_sent')}
+                                className={getButtonClass(filters.reportSent === 'not_sent')}
+                            >
+                                Sem Relatório
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Dados dos Clientes */}
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-3">Completude dos Dados</label>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                onClick={() => handleFilterChange('dataCompleteness', 'all')}
+                                className={getButtonClass(filters.dataCompleteness === 'all')}
+                            >
+                                Todos
+                            </button>
+                            <button
+                                onClick={() => handleFilterChange('dataCompleteness', 'complete')}
+                                className={getButtonClass(filters.dataCompleteness === 'complete', 'success')}
+                            >
+                                ✅ Dados Completos
+                            </button>
+                            <button
+                                onClick={() => handleFilterChange('dataCompleteness', 'incomplete')}
+                                className={getButtonClass(filters.dataCompleteness === 'incomplete', 'warning')}
+                            >
+                                ⚠️ Dados Incompletos
+                                {filterStats.incompleteCount > 0 && (
+                                    <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-800">
+                                        {filterStats.incompleteCount}
+                                    </span>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Controles de Ordenação e Cidade */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Ordenação */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Ordenar por
                             </label>
                             <select
                                 value={filters.sortBy}
                                 onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             >
                                 <option value="clientNumber">Número do Cliente</option>
                                 <option value="name">Nome</option>
@@ -276,13 +381,13 @@ const AdvancedFilter = ({ clients, onFilterChange }) => {
 
                         {/* Ordem */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Ordem
                             </label>
                             <select
                                 value={filters.sortOrder}
                                 onChange={(e) => handleFilterChange('sortOrder', e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             >
                                 <option value="asc">Crescente (A-Z, 1-9)</option>
                                 <option value="desc">Decrescente (Z-A, 9-1)</option>
@@ -291,88 +396,57 @@ const AdvancedFilter = ({ clients, onFilterChange }) => {
 
                         {/* Cidade */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Cidade ({cities.length})
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Cidade
                             </label>
                             <select
                                 value={filters.city}
                                 onChange={(e) => handleFilterChange('city', e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             >
-                                <option value="all">Todas as Cidades</option>
+                                <option value="all">Todas as Cidades ({cities.length})</option>
                                 {cities.map(city => (
                                     <option key={city} value={city}>{city}</option>
                                 ))}
                             </select>
                         </div>
-
-                        {/* Completude dos Dados */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Dados dos Clientes
-                            </label>
-                            <select
-                                value={filters.dataCompleteness}
-                                onChange={(e) => handleFilterChange('dataCompleteness', e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded-md text-sm"
-                            >
-                                <option value="all">Todos</option>
-                                <option value="complete">Dados Completos</option>
-                                <option value="incomplete">⚠️ Dados Incompletos ({filterStats.incompleteCount})</option>
-                            </select>
-                        </div>
                     </div>
                 </div>
             )}
 
-            {/* Estatísticas dos Filtros */}
-            <div className="mt-4 flex flex-wrap gap-4 text-sm text-gray-600">
-                <span className="flex items-center">
-                    📊 <strong className="ml-1">{filterStats.total}</strong> de {filterStats.totalClients} clientes
-                </span>
-                
-                {filterStats.incompleteCount > 0 && (
-                    <span className="flex items-center text-orange-600">
-                        ⚠️ <strong className="ml-1">{filterStats.incompleteCount}</strong> com dados incompletos
-                    </span>
-                )}
-                
-                <span className="flex items-center">
-                    🏙️ <strong className="ml-1">{filterStats.citiesCount}</strong> cidades diferentes
-                </span>
-
-                {hasActiveFilters() && (
-                    <span className="flex items-center text-indigo-600">
-                        🔍 <strong className="ml-1">Filtros ativos</strong>
-                    </span>
-                )}
-            </div>
-
-            {/* Lista de Clientes com Dados Incompletos (quando filtro ativo) */}
-            {filters.dataCompleteness === 'incomplete' && filteredAndSortedClients.length > 0 && (
-                <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-md">
-                    <h4 className="text-sm font-semibold text-orange-800 mb-2">
-                        ⚠️ Clientes com Dados Incompletos:
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                        {filteredAndSortedClients.slice(0, 6).map(client => {
-                            const missing = getMissingFields(client);
-                            return (
-                                <div key={client.id} className="text-orange-700">
-                                    <strong>{client.clientNumber ? `${client.clientNumber} - ` : ''}{client.name}</strong>
-                                    <br />
-                                    <span className="text-orange-600">Faltando: {missing.join(', ')}</span>
-                                </div>
-                            );
-                        })}
-                        {filteredAndSortedClients.length > 6 && (
-                            <div className="text-orange-600 italic">
-                                ... e mais {filteredAndSortedClients.length - 6} clientes
-                            </div>
+            {/* Footer com Estatísticas */}
+            <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 rounded-b-lg">
+                <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-gray-600">
+                    <div className="flex flex-wrap items-center gap-4">
+                        <span>
+                            <span className="font-medium text-gray-900">{filterStats.total}</span> de {filterStats.totalClients} clientes
+                        </span>
+                        
+                        {filterStats.reportSentCount > 0 && (
+                            <span>
+                                <span className="font-medium text-blue-600">{filterStats.reportSentCount}</span> com relatório
+                            </span>
                         )}
+                        
+                        {filterStats.incompleteCount > 0 && (
+                            <span>
+                                <span className="font-medium text-orange-600">{filterStats.incompleteCount}</span> incompletos
+                            </span>
+                        )}
+                        
+                        <span>
+                            <span className="font-medium text-gray-900">{filterStats.citiesCount}</span> cidades
+                        </span>
                     </div>
+
+                    {hasActiveFilters() && (
+                        <div className="flex items-center text-blue-600">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                            <span className="font-medium">Filtros ativos</span>
+                        </div>
+                    )}
                 </div>
-            )}
+            </div>
         </div>
     );
 };

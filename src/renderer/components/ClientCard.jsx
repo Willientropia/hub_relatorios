@@ -1,20 +1,14 @@
-// Em src/renderer/components/ClientCard.jsx
-
 const ClientCard = ({ client, onDetailsClick }) => {
-    // ALTERADO: Mapeamento de status e estilos
+    // Mapeamento de status e estilos atualizados
     const statusStyles = {
-        expired: { bg: 'bg-red-100', text: 'text-red-800', label: 'Vencido' },
-        report_sent: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Relatório Enviado' },
-        om_sold: { bg: 'bg-green-100', text: 'text-green-800', label: 'O&M Vendido' },
-        
-        // Mantendo os antigos para compatibilidade, se houver
         active: { bg: 'bg-green-100', text: 'text-green-800', label: 'Em Garantia' },
-        monitoring: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Monitoramento' },
+        expired: { bg: 'bg-red-100', text: 'text-red-800', label: 'Expirada' },
+        monitoring: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Monitoramento' },
         recurring_maintenance: { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Manutenção' },
         om_complete: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'O&M Completo' }
     };
     
-    // O padrão será 'Vencido'
+    // O padrão será 'Expirada' se não encontrar o status
     const style = statusStyles[client.status] || statusStyles.expired;
 
     return (
@@ -24,14 +18,33 @@ const ClientCard = ({ client, onDetailsClick }) => {
                     <h3 className="text-lg font-bold text-gray-800 pr-2">
                         {client.clientNumber ? `${client.clientNumber} - ` : ''}{client.name || 'Nome não informado'}
                     </h3>
-                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${style.bg} ${style.text}`}>{style.label}</span>
+                    <div className="flex flex-col items-end gap-1">
+                        <span className={`px-3 py-1 text-xs font-semibold rounded-full ${style.bg} ${style.text}`}>
+                            {style.label}
+                        </span>
+                        
+                        {/* NOVO: Indicador de relatório enviado */}
+                        {client.reportSent === true && (
+                            <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                                <span>📄</span>
+                                <span>Relatório Enviado</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
+                
                 <div className="space-y-2 text-sm text-gray-600">
                     <p><strong>📍 Local:</strong> {client.address || 'N/A'}</p>
                     <p><strong>📅 Instalação:</strong> {client.installDate || 'N/A'}</p>
                     <p><strong>⚡ Potência:</strong> {client.power || 'N/A'} kWp</p>
+                    
+                    {/* NOVO: Mostrar se tem placas informadas */}
+                    {client.panels && client.panels !== 'N/A' && client.panels !== 0 && (
+                        <p><strong>🔆 Placas:</strong> {client.panels}</p>
+                    )}
                 </div>
             </div>
+            
             <div className="mt-5 pt-4 border-t border-gray-100">
                 <button 
                     onClick={onDetailsClick}
@@ -39,6 +52,15 @@ const ClientCard = ({ client, onDetailsClick }) => {
                 >
                     Ver Detalhes e UCs
                 </button>
+                
+                {/* NOVO: Informação adicional se tem relatório enviado */}
+                {client.reportSent === true && (
+                    <div className="mt-2 text-center">
+                        <span className="text-xs text-blue-600 font-medium">
+                            ✅ Usina entregue ao cliente
+                        </span>
+                    </div>
+                )}
             </div>
         </div>
     );

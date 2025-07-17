@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 
-// Componente Principal
+// Componente Principal FINAL - SEM INFORMAÇÕES EXTRAS
 function App() {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [clients, setClients] = useState([]);
@@ -37,7 +37,6 @@ function App() {
             querySnapshot.forEach((doc) => {
                 const data = doc.data();
                 
-                // ===== INÍCIO DA CORREÇÃO =====
                 // Converte o timestamp do Firebase para uma string de data legível
                 let installDateStr = data.installDate;
                 if (installDateStr && typeof installDateStr.toDate === 'function') {
@@ -45,12 +44,13 @@ function App() {
                         day: '2-digit', month: '2-digit', year: 'numeric'
                     });
                 }
-                // ===== FIM DA CORREÇÃO =====
 
                 clientsData.push({ 
                     id: doc.id, 
                     ...data,
-                    installDate: installDateStr // Usa a data já formatada
+                    installDate: installDateStr,
+                    // Garantir que reportSent existe (após migração)
+                    reportSent: data.reportSent || false
                 });
             });
             
@@ -70,30 +70,25 @@ function App() {
     }, [authReady, userId]);
 
     const calculateStatus = (installDateStr, currentStatus) => {
-        // Se já tem um status manual, mantém.
-        if (['expired', 'report_sent', 'om_sold', 'monitoring', 'recurring_maintenance', 'om_complete'].includes(currentStatus)) {
+        // Valida se o status é válido, senão define como 'expired'
+        const validStatuses = ['active', 'expired', 'monitoring', 'recurring_maintenance', 'om_complete'];
+        
+        if (validStatuses.includes(currentStatus)) {
             return currentStatus;
         }
 
-        // Se é um cliente novo ou o status é desconhecido, o padrão é 'expired'
         return 'expired';
     };
 
     const stats = useMemo(() => {
         return {
             total: clients.length,
-            // ATENÇÃO: Os status 'active' e outros antigos não existem mais no novo fluxo.
-            // Você pode remover ou adaptar estas estatísticas.
-            // Por enquanto, vamos manter a estrutura, mas os valores podem ser 0.
-            expired: clients.filter(c => c.status === 'expired').length,
-            report_sent: clients.filter(c => c.status === 'report_sent').length,
-            om_sold: clients.filter(c => c.status === 'om_sold').length,
-            
-            // Mantendo os antigos para não quebrar o Dashboard, mas eles não serão mais atualizados.
             active: clients.filter(c => c.status === 'active').length,
+            expired: clients.filter(c => c.status === 'expired').length,
             monitoring: clients.filter(c => c.status === 'monitoring').length,
             recurring_maintenance: clients.filter(c => c.status === 'recurring_maintenance').length,
-            om_complete: clients.filter(c => c.status === 'om_complete').length
+            om_complete: clients.filter(c => c.status === 'om_complete').length,
+            reportSent: clients.filter(c => c.reportSent === true).length
         };
     }, [clients]);
 
