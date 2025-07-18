@@ -15,11 +15,11 @@ Sobre os erros atuais do programa:
 
 
 
-Os dados dos clientes podem ser alterados (como o número do cliente, nome e etc.)
+######## Os dados dos clientes podem ser alterados (como o número do cliente, nome e etc.)
 
-Corrigir bugs de não poder digitar que ocorrem às vezes.
+######## Corrigir bugs de não poder digitar que ocorrem às vezes.
 
-Alterar a versão do app com base nessas correções.
+######## Alterar a versão do app com base nessas correções.
 
 poder criar um relatório mesmo se o saldo for 0, mas ter um aviso nesse cliente que ele não possui saldo, 
 como uma tag aparecendo no card dele para poder ser pesquisado.

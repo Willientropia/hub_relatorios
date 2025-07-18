@@ -1,8 +1,8 @@
 {
   "name": "hub-monitoramento",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Aplicação de gestão de clientes solares.",
-  "author": "Sua Empresa ou Seu Nome",
+  "author": "Pedro Willie",
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
@@ -27,7 +27,7 @@
     },
     "win": {
       "target": "nsis",
-      "icon": "assets/icon.ico"
+      "icon": "src/renderer/assets/icon.ico"
     }
   }
 }
