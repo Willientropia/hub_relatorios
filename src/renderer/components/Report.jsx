@@ -18,6 +18,7 @@ const Report = ({ client, consumerUnits, onReportGenerated }) => {
     const chartRef = useRef(null);
     const page1Ref = useRef(null);
     const page2Ref = useRef(null);
+    const chartInstanceRef = useRef(null);
 
     const processedData = useMemo(() => {
         const monthlyData = {};
@@ -91,58 +92,108 @@ const Report = ({ client, consumerUnits, onReportGenerated }) => {
         return { labels, datasets: Object.values(datasets), tableRows, totals };
     }, [client, consumerUnits]);
 
+    // CORRIGIDO: Efeito melhorado para geração de PDF com limpeza adequada
     useEffect(() => {
         const generatePdf = async () => {
-            const chartCtx = chartRef.current.getContext('2d');
-            const chartInstance = new Chart(chartCtx, {
-                type: 'bar',
-                data: {
-                    labels: processedData.labels,
-                    datasets: processedData.datasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: false,
-                    plugins: {
-                        title: { display: false },
-                        legend: { position: 'bottom', labels: { font: { size: 10, family: 'Arial' }, color: COLORS.text } }
+            try {
+                // Bloquear scroll durante a geração do PDF
+                document.body.style.overflow = 'hidden';
+
+                const chartCtx = chartRef.current?.getContext('2d');
+                if (!chartCtx) {
+                    console.error('Não foi possível obter o contexto do canvas');
+                    onReportGenerated();
+                    return;
+                }
+
+                // Destruir instância anterior do Chart se existir
+                if (chartInstanceRef.current) {
+                    chartInstanceRef.current.destroy();
+                    chartInstanceRef.current = null;
+                }
+
+                chartInstanceRef.current = new Chart(chartCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: processedData.labels,
+                        datasets: processedData.datasets
                     },
-                    scales: {
-                        x: { stacked: true, ticks: { font: { size: 10, family: 'Arial' }, color: COLORS.textLight }, grid: { display: false } },
-                        y: { stacked: true, beginAtZero: true, ticks: { font: { size: 10, family: 'Arial' }, color: COLORS.textLight }, grid: { color: COLORS.border } }
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: false,
+                        plugins: {
+                            title: { display: false },
+                            legend: { position: 'bottom', labels: { font: { size: 10, family: 'Arial' }, color: COLORS.text } }
+                        },
+                        scales: {
+                            x: { stacked: true, ticks: { font: { size: 10, family: 'Arial' }, color: COLORS.textLight }, grid: { display: false } },
+                            y: { stacked: true, beginAtZero: true, ticks: { font: { size: 10, family: 'Arial' }, color: COLORS.textLight }, grid: { color: COLORS.border } }
+                        }
                     }
+                });
+
+                // Aguardar renderização do chart
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                const pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+                
+                const addPageAsImage = async (ref, pageNumber) => {
+                    if (!ref.current) return;
+                    
+                    const canvas = await html2canvas(ref.current, { 
+                        scale: 2, 
+                        backgroundColor: null,
+                        useCORS: true,
+                        allowTaint: true
+                    });
+                    
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+                    if (pageNumber > 1) {
+                        pdf.addPage();
+                    }
+                    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight);
+                };
+
+                await addPageAsImage(page1Ref, 1);
+                
+                if (processedData.tableRows.length > 0) {
+                    await addPageAsImage(page2Ref, 2);
                 }
-            });
-
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            const pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-            
-            const addPageAsImage = async (ref, pageNumber) => {
-                const canvas = await html2canvas(ref.current, { scale: 2, backgroundColor: null });
-                const imgData = canvas.toDataURL('image/png');
-                const pdfWidth = pdf.internal.pageSize.getWidth();
-                const imgHeight = (canvas.height * pdfWidth) / canvas.width;
-
-                if (pageNumber > 1) {
-                    pdf.addPage();
+                
+                pdf.save(`relatorio-${client.name.replace(/\s/g, '_')}.pdf`);
+                
+            } catch (error) {
+                console.error('Erro ao gerar PDF:', error);
+                alert('Erro ao gerar o relatório. Tente novamente.');
+            } finally {
+                // IMPORTANTE: Limpeza adequada
+                if (chartInstanceRef.current) {
+                    chartInstanceRef.current.destroy();
+                    chartInstanceRef.current = null;
                 }
-                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight);
-            };
-
-            await addPageAsImage(page1Ref, 1);
-            
-            if (processedData.tableRows.length > 0) {
-                await addPageAsImage(page2Ref, 2);
+                
+                // Restaurar scroll
+                document.body.style.overflow = 'unset';
+                
+                // Chamar callback
+                onReportGenerated();
             }
-            
-            pdf.save(`relatorio-${client.name.replace(/\s/g, '_')}.pdf`);
-            chartInstance.destroy();
-            onReportGenerated();
         };
 
         generatePdf();
+
+        // Cleanup no unmount
+        return () => {
+            if (chartInstanceRef.current) {
+                chartInstanceRef.current.destroy();
+                chartInstanceRef.current = null;
+            }
+            document.body.style.overflow = 'unset';
+        };
     }, [processedData, onReportGenerated, client.name]);
     
     // --- COMPONENTES DE ESTILO ---

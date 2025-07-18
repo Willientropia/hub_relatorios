@@ -57,30 +57,64 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
         return () => unsubscribe();
     }, [client.id, isEditing]);
 
+    // NOVO: Efeito para bloquear scroll da página quando modal está aberto
+    useEffect(() => {
+        // Bloquear scroll da página
+        document.body.style.overflow = 'hidden';
+        
+        // Cleanup: restaurar scroll quando componente é desmontado
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, []);
+
     // --- FUNÇÕES DA VIEW DE DETALHES ---
     const handleAddConsumerUnit = async () => {
         if (!newUcName.trim()) return;
-        const { getFirestore, collection, addDoc, serverTimestamp } = window.firebase;
-        const db = getFirestore();
-        await addDoc(collection(db, `solar-clients/${client.id}/consumerUnits`), { name: newUcName.trim(), balanceKWH: 0, history: [], createdAt: serverTimestamp() });
-        setNewUcName('');
+        try {
+            const { getFirestore, collection, addDoc, serverTimestamp } = window.firebase;
+            const db = getFirestore();
+            await addDoc(collection(db, `solar-clients/${client.id}/consumerUnits`), { 
+                name: newUcName.trim(), 
+                balanceKWH: 0, 
+                history: [], 
+                createdAt: serverTimestamp() 
+            });
+            setNewUcName('');
+        } catch (error) {
+            console.error("Erro ao adicionar UC:", error);
+            alert('Erro ao adicionar unidade consumidora.');
+        }
     };
     
     const handleDeleteConsumerUnit = async (ucId) => {
         if (!confirm('Tem certeza?')) return;
-        const { getFirestore, doc, deleteDoc } = window.firebase;
-        const db = getFirestore();
-        await deleteDoc(doc(db, `solar-clients/${client.id}/consumerUnits`, ucId));
+        try {
+            const { getFirestore, doc, deleteDoc } = window.firebase;
+            const db = getFirestore();
+            await deleteDoc(doc(db, `solar-clients/${client.id}/consumerUnits`, ucId));
+        } catch (error) {
+            console.error("Erro ao deletar UC:", error);
+            alert('Erro ao deletar unidade consumidora.');
+        }
     };
 
     const debouncedUpdateBalance = useCallback(debounce(async (ucId, balance) => {
-        const { getFirestore, doc, updateDoc } = window.firebase;
-        const db = getFirestore();
-        await updateDoc(doc(db, `solar-clients/${client.id}/consumerUnits`, ucId), { balanceKWH: parseFloat(balance) || 0 });
+        try {
+            const { getFirestore, doc, updateDoc } = window.firebase;
+            const db = getFirestore();
+            await updateDoc(doc(db, `solar-clients/${client.id}/consumerUnits`, ucId), { 
+                balanceKWH: parseFloat(balance) || 0 
+            });
+        } catch (error) {
+            console.error("Erro ao atualizar saldo:", error);
+        }
     }, 1000), [client.id]);
 
     const handleBalanceChange = (ucId, value) => {
-        setConsumerUnits(prev => prev.map(unit => unit.id === ucId ? { ...unit, balanceKWH: value } : unit));
+        setConsumerUnits(prev => prev.map(unit => 
+            unit.id === ucId ? { ...unit, balanceKWH: value } : unit
+        ));
         debouncedUpdateBalance(ucId, value);
     };
     
@@ -89,8 +123,15 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
         try {
             const { getFirestore, doc, updateDoc, collection, addDoc, serverTimestamp } = window.firebase;
             const db = getFirestore();
-            await updateDoc(doc(db, 'solar-clients', client.id), { status: selectedStatus, reportSent, updatedAt: serverTimestamp() });
-            await addDoc(collection(db, `solar-clients/${client.id}/history`), { event: `Status alterado para: ${selectedStatus}${reportSent ? ' (Relatório enviado)' : ''}`, timestamp: serverTimestamp() });
+            await updateDoc(doc(db, 'solar-clients', client.id), { 
+                status: selectedStatus, 
+                reportSent, 
+                updatedAt: serverTimestamp() 
+            });
+            await addDoc(collection(db, `solar-clients/${client.id}/history`), { 
+                event: `Status alterado para: ${selectedStatus}${reportSent ? ' (Relatório enviado)' : ''}`, 
+                timestamp: serverTimestamp() 
+            });
             alert('Status atualizado com sucesso!');
         } catch (error) {
             console.error("Erro ao atualizar status:", error);
@@ -100,7 +141,11 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
         }
     };
 
-    const canGenerateReport = useMemo(() => consumerUnits.length > 0 && consumerUnits.every(uc => parseFloat(uc.balanceKWH) > 0 && uc.history?.length > 0), [consumerUnits]);
+    const canGenerateReport = useMemo(() => 
+        consumerUnits.length > 0 && 
+        consumerUnits.every(uc => parseFloat(uc.balanceKWH) > 0 && uc.history?.length > 0), 
+        [consumerUnits]
+    );
 
     // --- FUNÇÕES DA VIEW DE EDIÇÃO ---
     const handleFormChange = (e) => {
@@ -133,7 +178,10 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
             });
 
             const historyRef = collection(db, `solar-clients/${client.id}/history`);
-            await addDoc(historyRef, { event: 'Dados do cliente atualizados.', timestamp: serverTimestamp() });
+            await addDoc(historyRef, { 
+                event: 'Dados do cliente atualizados.', 
+                timestamp: serverTimestamp() 
+            });
             
             alert('Cliente atualizado com sucesso!');
             setIsEditing(false);
@@ -145,10 +193,58 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
         }
     };
 
+    // CORRIGIDO: Função para lidar com o fechamento e limpeza
+    const handleClose = useCallback(() => {
+        // Resetar todos os estados para valores iniciais
+        setIsEditing(false);
+        setViewingHistoryFor(null);
+        setIsGeneratingReport(false);
+        setSaving(false);
+        setIsSavingEdit(false);
+        setEditError('');
+        setNewUcName('');
+        
+        // Restaurar scroll da página
+        document.body.style.overflow = 'unset';
+        
+        // Chamar o callback de fechamento
+        onClose();
+    }, [onClose]);
+
+    // CORRIGIDO: Prevenir fechamento quando clica no modal
+    const handleModalClick = (e) => {
+        e.stopPropagation();
+    };
+
+    // NOVO: Estilos inline para garantir cobertura completa
+    const modalBackdropStyles = {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 999999,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: '1rem'
+    };
+
     return (
         <>
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-                <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-full flex flex-col">
+            {/* CORRIGIDO: Modal backdrop com estilos inline para garantir cobertura total */}
+            <div 
+                style={modalBackdropStyles}
+                onClick={handleClose}
+            >
+                <div 
+                    className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col relative"
+                    style={{ maxHeight: 'calc(100vh - 2rem)' }}
+                    onClick={handleModalClick}
+                >
                     <div className="p-6 border-b flex justify-between items-start">
                         <div>
                              <h2 className="text-xl font-bold text-gray-900">
@@ -160,7 +256,12 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
                                 </span>
                             )}
                         </div>
-                        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none -mt-1 -mr-2 p-1">&times;</button>
+                        <button 
+                            onClick={handleClose} 
+                            className="text-gray-400 hover:text-gray-600 text-2xl leading-none -mt-1 -mr-2 p-1"
+                        >
+                            &times;
+                        </button>
                     </div>
 
                     {isEditing ? (
@@ -168,33 +269,86 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
                             <div className="p-6 space-y-4 overflow-y-auto">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">Nº do Cliente</label>
-                                    <input type="text" name="clientNumber" value={formData.clientNumber} onChange={handleFormChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                                    <input 
+                                        type="text" 
+                                        name="clientNumber" 
+                                        value={formData.clientNumber} 
+                                        onChange={handleFormChange} 
+                                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" 
+                                        autoComplete="off"
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">Nome</label>
-                                    <input type="text" name="name" value={formData.name} onChange={handleFormChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                                    <input 
+                                        type="text" 
+                                        name="name" 
+                                        value={formData.name} 
+                                        onChange={handleFormChange} 
+                                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" 
+                                        autoComplete="off"
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">Endereço</label>
-                                    <input type="text" name="address" value={formData.address} onChange={handleFormChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                                    <input 
+                                        type="text" 
+                                        name="address" 
+                                        value={formData.address} 
+                                        onChange={handleFormChange} 
+                                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" 
+                                        autoComplete="off"
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">Data de Instalação (DD/MM/AAAA)</label>
-                                    <input type="text" name="installDate" value={formData.installDate} onChange={handleFormChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                                    <input 
+                                        type="text" 
+                                        name="installDate" 
+                                        value={formData.installDate} 
+                                        onChange={handleFormChange} 
+                                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" 
+                                        autoComplete="off"
+                                    />
                                 </div>
                                  <div>
                                     <label className="block text-sm font-medium text-gray-700">Nº de Placas</label>
-                                    <input type="number" name="panels" value={formData.panels} onChange={handleFormChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                                    <input 
+                                        type="number" 
+                                        name="panels" 
+                                        value={formData.panels} 
+                                        onChange={handleFormChange} 
+                                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" 
+                                        autoComplete="off"
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">Potência (kWp)</label>
-                                    <input type="text" name="power" value={formData.power} onChange={handleFormChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Ex: 4,55"/>
+                                    <input 
+                                        type="text" 
+                                        name="power" 
+                                        value={formData.power} 
+                                        onChange={handleFormChange} 
+                                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" 
+                                        placeholder="Ex: 4,55"
+                                        autoComplete="off"
+                                    />
                                 </div>
                                 {editError && <p className="text-red-500 mt-2 text-sm">{editError}</p>}
                             </div>
                             <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 rounded-b-lg border-t">
-                                <button onClick={() => setIsEditing(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancelar</button>
-                                <button onClick={handleSaveEdits} disabled={isSavingEdit} className="px-4 py-2 bg-indigo-600 text-white rounded-md font-semibold hover:bg-indigo-700 disabled:bg-gray-400">
+                                <button 
+                                    onClick={() => setIsEditing(false)} 
+                                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+                                    disabled={isSavingEdit}
+                                >
+                                    Cancelar
+                                </button>
+                                <button 
+                                    onClick={handleSaveEdits} 
+                                    disabled={isSavingEdit} 
+                                    className="px-4 py-2 bg-indigo-600 text-white rounded-md font-semibold hover:bg-indigo-700 disabled:bg-gray-400"
+                                >
                                     {isSavingEdit ? 'Salvando...' : 'Salvar Alterações'}
                                 </button>
                             </div>
@@ -214,7 +368,12 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
                                     <div className="flex flex-col sm:flex-row gap-4">
                                         <div className="flex-1">
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Status:</label>
-                                            <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md">
+                                            <select 
+                                                value={selectedStatus} 
+                                                onChange={(e) => setSelectedStatus(e.target.value)} 
+                                                className="w-full p-2 border border-gray-300 rounded-md"
+                                                disabled={saving}
+                                            >
                                                 <option value="active">Em Garantia</option>
                                                 <option value="expired">Expirada</option>
                                                 <option value="monitoring">Monitoramento</option>
@@ -224,13 +383,23 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
                                         </div>
                                         <div className="flex items-center">
                                             <label className="flex items-center cursor-pointer">
-                                                <input type="checkbox" checked={reportSent} onChange={(e) => setReportSent(e.target.checked)} className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500" />
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={reportSent} 
+                                                    onChange={(e) => setReportSent(e.target.checked)} 
+                                                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500" 
+                                                    disabled={saving}
+                                                />
                                                 <span className="ml-2 text-sm font-medium text-gray-700">📄 Relatório enviado</span>
                                             </label>
                                         </div>
                                     </div>
                                     <div className="flex justify-end">
-                                        <button onClick={handleUpdateStatus} disabled={saving} className="px-4 py-2 bg-indigo-600 text-white rounded-md font-semibold hover:bg-indigo-700 disabled:bg-gray-400">
+                                        <button 
+                                            onClick={handleUpdateStatus} 
+                                            disabled={saving} 
+                                            className="px-4 py-2 bg-indigo-600 text-white rounded-md font-semibold hover:bg-indigo-700 disabled:bg-gray-400"
+                                        >
                                             {saving ? 'Salvando...' : 'Atualizar Status'}
                                         </button>
                                     </div>
@@ -240,8 +409,26 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
                              <div className="space-y-4">
                                 <h3 className="text-lg font-semibold text-gray-800">Unidades Consumidoras</h3>
                                 <div className="flex gap-2 p-2 bg-gray-50 rounded-md">
-                                    <input type="text" value={newUcName} onChange={(e) => setNewUcName(e.target.value)} placeholder="Nome da nova Unidade Consumidora" className="flex-1 p-2 border border-gray-300 rounded-md" />
-                                    <button onClick={handleAddConsumerUnit} className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">Adicionar</button>
+                                    <input 
+                                        type="text" 
+                                        value={newUcName} 
+                                        onChange={(e) => setNewUcName(e.target.value)} 
+                                        placeholder="Nome da nova Unidade Consumidora" 
+                                        className="flex-1 p-2 border border-gray-300 rounded-md" 
+                                        autoComplete="off"
+                                        onKeyPress={(e) => {
+                                            if (e.key === 'Enter') {
+                                                handleAddConsumerUnit();
+                                            }
+                                        }}
+                                    />
+                                    <button 
+                                        onClick={handleAddConsumerUnit} 
+                                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                                        disabled={!newUcName.trim()}
+                                    >
+                                        Adicionar
+                                    </button>
                                 </div>
                                 <div className="border rounded-lg overflow-hidden">
                                     <table className="min-w-full">
@@ -253,15 +440,43 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white divide-y divide-gray-200">
-                                            {loadingUCs && (<tr><td colSpan="3" className="p-4 text-center">Carregando...</td></tr>)}
-                                            {!loadingUCs && consumerUnits.length === 0 && (<tr><td colSpan="3" className="p-4 text-center text-gray-500">Nenhuma unidade consumidora adicionada.</td></tr>)}
+                                            {loadingUCs && (
+                                                <tr>
+                                                    <td colSpan="3" className="p-4 text-center">Carregando...</td>
+                                                </tr>
+                                            )}
+                                            {!loadingUCs && consumerUnits.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="3" className="p-4 text-center text-gray-500">
+                                                        Nenhuma unidade consumidora adicionada.
+                                                    </td>
+                                                </tr>
+                                            )}
                                             {consumerUnits.map(uc => (
                                                 <tr key={uc.id}>
                                                     <td className="p-3">{uc.name}</td>
-                                                    <td className="p-3"><input type="number" value={uc.balanceKWH} onChange={(e) => handleBalanceChange(uc.id, e.target.value)} className="w-32 p-1 border border-gray-300 rounded-md" /></td>
+                                                    <td className="p-3">
+                                                        <input 
+                                                            type="number" 
+                                                            value={uc.balanceKWH} 
+                                                            onChange={(e) => handleBalanceChange(uc.id, e.target.value)} 
+                                                            className="w-32 p-1 border border-gray-300 rounded-md" 
+                                                            autoComplete="off"
+                                                        />
+                                                    </td>
                                                     <td className="p-3 flex gap-2">
-                                                        <button onClick={() => setViewingHistoryFor(uc)} className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded hover:bg-blue-200">Histórico</button>
-                                                        <button onClick={() => handleDeleteConsumerUnit(uc.id)} className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded hover:bg-red-200">Apagar</button>
+                                                        <button 
+                                                            onClick={() => setViewingHistoryFor(uc)} 
+                                                            className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded hover:bg-blue-200"
+                                                        >
+                                                            Histórico
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleDeleteConsumerUnit(uc.id)} 
+                                                            className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded hover:bg-red-200"
+                                                        >
+                                                            Apagar
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -269,7 +484,12 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
                                     </table>
                                 </div>
                                 <div className="mt-6 flex justify-end">
-                                    <button onClick={() => setIsGeneratingReport(true)} disabled={!canGenerateReport || isGeneratingReport} className="px-6 py-3 bg-green-600 text-white font-bold rounded-md hover:bg-green-700 disabled:bg-gray-400" title={!canGenerateReport ? "Preencha saldo e histórico de todas as UCs" : ""}>
+                                    <button 
+                                        onClick={() => setIsGeneratingReport(true)} 
+                                        disabled={!canGenerateReport || isGeneratingReport} 
+                                        className="px-6 py-3 bg-green-600 text-white font-bold rounded-md hover:bg-green-700 disabled:bg-gray-400" 
+                                        title={!canGenerateReport ? "Preencha saldo e histórico de todas as UCs" : ""}
+                                    >
                                         {isGeneratingReport ? 'Gerando PDF...' : 'Gerar Relatório'}
                                     </button>
                                 </div>
@@ -279,8 +499,22 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
                 </div>
             </div>
 
-            {viewingHistoryFor && <ConsumerUnitHistory uc={viewingHistoryFor} clientId={client.id} userId={userId} onClose={() => setViewingHistoryFor(null)} />}
-            {isGeneratingReport && <Report client={client} consumerUnits={consumerUnits} onReportGenerated={() => setIsGeneratingReport(false)} />}
+            {/* Modais aninhados */}
+            {viewingHistoryFor && (
+                <ConsumerUnitHistory 
+                    uc={viewingHistoryFor} 
+                    clientId={client.id} 
+                    userId={userId} 
+                    onClose={() => setViewingHistoryFor(null)} 
+                />
+            )}
+            {isGeneratingReport && (
+                <Report 
+                    client={client} 
+                    consumerUnits={consumerUnits} 
+                    onReportGenerated={() => setIsGeneratingReport(false)} 
+                />
+            )}
         </>
     );
 };
