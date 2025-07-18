@@ -230,7 +230,9 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: '1rem'
+        padding: '1rem',
+        margin: 0,
+        transform: 'none'
     };
 
     return (

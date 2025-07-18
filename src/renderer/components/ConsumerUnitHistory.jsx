@@ -138,7 +138,9 @@ const ConsumerUnitHistory = ({ uc, clientId, userId, onClose }) => {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: '1rem'
+        padding: '1rem',
+        margin: 0,
+        transform: 'none'
     };
 
     return (
