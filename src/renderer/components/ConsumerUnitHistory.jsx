@@ -234,3 +234,5 @@ const ConsumerUnitHistory = ({ uc, clientId, userId, onClose }) => {
         </div>
     );
 };
+
+window.ConsumerUnitHistory = ConsumerUnitHistory;

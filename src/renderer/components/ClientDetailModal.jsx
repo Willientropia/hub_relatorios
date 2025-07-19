@@ -143,7 +143,12 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
 
     const canGenerateReport = useMemo(() => 
         consumerUnits.length > 0 && 
-        consumerUnits.every(uc => parseFloat(uc.balanceKWH) > 0 && uc.history?.length > 0), 
+        consumerUnits.every(uc => uc.history?.length > 0), // Remover verificação de saldo > 0
+        [consumerUnits]
+    );
+
+    const hasZeroBalanceUnits = useMemo(() =>
+        consumerUnits.some(uc => parseFloat(uc.balanceKWH) <= 0),
         [consumerUnits]
     );
 
@@ -485,12 +490,17 @@ const ClientDetailModal = ({ client, onClose, userId }) => {
                                         </tbody>
                                     </table>
                                 </div>
-                                <div className="mt-6 flex justify-end">
+                                <div className="mt-6 flex flex-col items-end gap-2">
+                                    {hasZeroBalanceUnits && (
+                                        <div className="text-sm text-orange-600 bg-orange-50 px-3 py-2 rounded-md border border-orange-200">
+                                            ⚠️ Atenção: Algumas UCs possuem saldo zero
+                                        </div>
+                                    )}
                                     <button 
                                         onClick={() => setIsGeneratingReport(true)} 
                                         disabled={!canGenerateReport || isGeneratingReport} 
                                         className="px-6 py-3 bg-green-600 text-white font-bold rounded-md hover:bg-green-700 disabled:bg-gray-400" 
-                                        title={!canGenerateReport ? "Preencha saldo e histórico de todas as UCs" : ""}
+                                        title={!canGenerateReport ? "É necessário ter histórico em todas as UCs" : ""}
                                     >
                                         {isGeneratingReport ? 'Gerando PDF...' : 'Gerar Relatório'}
                                     </button>
