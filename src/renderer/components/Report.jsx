@@ -221,6 +221,28 @@ const Report = ({ client, consumerUnits, onReportGenerated }) => {
             <p style={{ fontSize: '22px', fontWeight: 'bold', color: color, margin: 0 }}>{value}</p>
         </div>
     );
+
+    const DisclaimerCard = () => (
+        <div style={{
+            padding: '20px',
+            border: `1px solid ${COLORS.border}`,
+            borderRadius: '8px',
+            backgroundColor: '#fff3cd',
+            borderColor: '#ffeaa7',
+            marginTop: '30px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+        }}>
+            <p style={{ 
+                fontSize: '10px', 
+                color: COLORS.text, 
+                margin: 0, 
+                lineHeight: '1.5',
+                textAlign: 'justify'
+            }}>
+                <strong>Importante:</strong>  Os valores de custo e economia apresentados não incluem o autoconsumo direto da energia solar. A economia real do cliente é superior ao demonstrado, pois não contabiliza toda a energia solar consumida no momento da geração.
+            </p>
+        </div>
+    );
     
     const commonStyles = {
         page: { fontFamily: 'Arial, sans-serif', color: COLORS.text, fontSize: '10px', backgroundColor: COLORS.white },
@@ -239,9 +261,9 @@ const Report = ({ client, consumerUnits, onReportGenerated }) => {
                 <Header title="Relatório de Consumo e Economia" clientName={`${client.clientNumber} - ${client.name}`} />
                 <div style={commonStyles.content}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', marginBottom: '30px' }}>
-                        <StatCard title="Custo Sem Solar" value={processedData.totals.estimatedCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} color={COLORS.text} />
+                        <StatCard title="Custo da Concessionária*" value={processedData.totals.estimatedCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} color={COLORS.text} />
                         <StatCard title="Valor Pago" value={processedData.totals.paid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} color={COLORS.primary} />
-                        <StatCard title="Economia Gerada" value={processedData.totals.savings.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} color={COLORS.secondary} />
+                        <StatCard title="Economia Gerada*" value={processedData.totals.savings.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} color={COLORS.secondary} />
                     </div>
                     
                     <h2 style={commonStyles.h2}>Consumo Mensal (kWh)</h2>
@@ -266,6 +288,8 @@ const Report = ({ client, consumerUnits, onReportGenerated }) => {
                             ))}
                         </tbody>
                     </table>
+
+                    <DisclaimerCard />
                 </div>
             </div>
 
