@@ -1,6 +1,6 @@
 {
   "name": "hub-monitoramento",
-  "version": "2.5.0",
+  "version": "2.5.2",
   "description": "Aplicação de gestão de clientes solares.",
   "author": "Pedro Willie",
   "main": "src/main/main.js",
